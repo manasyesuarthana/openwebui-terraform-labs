@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# MODIFIED VERSION OF: https://github.com/nicholasjackson/demo-terraform-basics/blob/main/aws/scripts/provision_basic.sh
+
+# Fail if one command fails
+set -e
+
+# Run the script in non-interactive mode so that the installation does not 
+# prompt for input
+export DEBIAN_FRONTEND=noninteractive
+
+# Install required packages
+apt-get update
+apt-get install -y ca-certificates curl sqlite3 apache2-utils
+
+# Setup Docker
+
+## Add Docker's official GPG key:
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+
+## Add the repository to Apt sources:
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt-get update
+
+## Install Docker
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Install the open_web_ui UI Server
+mkdir -p /etc/open-webui.d/
+
+## Create the admin user via the signup API
+## Open WebUI makes the first user to sign up the admin.
+## We start the container, wait for it to be ready, then call the signup API.
+
+ADMIN_EMAIL="admin@demo.gs"
+ADMIN_PASSWORD="mypassword"
+ADMIN_NAME="Admin User"
+
+# Pull the image
+/usr/bin/docker pull ghcr.io/open-webui/open-webui:ollama
+
+# Start Open Web UI so that it creates the database and becomes ready
+/usr/bin/docker run -d -p 80:8080 -v /etc/open-webui.d:/app/backend/data --name openwebui ghcr.io/open-webui/open-webui:ollama
+
+# Wait for the server to be ready (HTTP 200)
+timeout 600 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' localhost)" != "200" ]]; do sleep 5; done' || false
+
+# Create the admin account via the signup API (first signup = admin)
+curl -s -X POST http://localhost/api/v1/auths/signup \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"${ADMIN_EMAIL}\",\"password\":\"${ADMIN_PASSWORD}\",\"name\":\"${ADMIN_NAME}\"}"
+
+/usr/bin/docker stop openwebui
+/usr/bin/docker rm openwebui
+
+## Create the systemd unit
+## When starting systemd will load the environment file and pass the variables to the container
+cat << 'EOF' > /etc/systemd/system/openwebui.service
+[Unit]
+Description=Open Web UI
+After=docker.service
+Requires=docker.service
+
+[Service]
+TimeoutStartSec=0
+Type=simple
+Restart=always
+ExecStartPre=-/usr/bin/docker stop %n
+ExecStartPre=-/usr/bin/docker rm %n
+ExecStart=/usr/bin/docker run -p 80:8080 -e RAG_EMBEDDING_MODEL_AUTO_UPDATE=true -v /etc/open-webui.d:/app/backend/data --name %n ghcr.io/open-webui/open-webui:ollama
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+## Reload systemd and enable the service
+systemctl daemon-reload
+systemctl enable openwebui.service
+
+systemctl start openwebui.service
