@@ -102,7 +102,7 @@ resource "aws_key_pair" "open_web_ui" {
 
 resource "aws_spot_instance_request" "open_web_ui" {
   ami                         = data.aws_ami.debian.id
-  instance_type               = "t3.micro"
+  instance_type               = "t3.medium"
   associate_public_ip_address = true
   key_name                    = aws_key_pair.open_web_ui.key_name
 
