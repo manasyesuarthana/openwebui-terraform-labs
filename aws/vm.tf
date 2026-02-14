@@ -100,6 +100,11 @@ resource "aws_key_pair" "open_web_ui" {
   public_key = file("") # add a public SSH key path
 }
 
+resource "random_password" "password" {
+  length  = 16
+  special = false
+}
+
 resource "aws_spot_instance_request" "open_web_ui" {
   ami                         = data.aws_ami.debian.id
   instance_type               = "t3.medium"
@@ -118,7 +123,13 @@ resource "aws_spot_instance_request" "open_web_ui" {
     volume_type = "gp3"
   }
 
-  user_data_base64 = base64encode(file("${path.module}/scripts/provision_basic.sh")) # add provisioning script
+  user_data_base64 = base64encode(
+    templatefile("${path.module}/scripts/provision_basic.sh",
+      {
+        open_webui_user     = var.open_webui_user,
+        open_webui_password = random_password.password.result
+    })
+  )
 }
 
 # use terracurl to test responsiveness of the deployed openweb UI instance
