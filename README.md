@@ -1,5 +1,8 @@
 # Terraform Labs — Deploy OpenWebUI on AWS, GCP & Azure
 
+<img src="./banner.jpg" alt="Terraform Labs Banner" width="100%">
+
+<br />
 A hands-on Infrastructure as Code (IaC) learning project for deploying [Open WebUI](https://github.com/open-webui/open-webui) across multiple cloud providers using [Terraform](https://www.terraform.io/). The goal is to practice and solidify Terraform skills by provisioning real cloud infrastructure from scratch — networking, compute, security, and application deployment — all defined as code.
 
 > **Credits:** Inspired by [Nicholas Jackson's](https://github.com/nicholasjackson) excellent Terraform guide.
