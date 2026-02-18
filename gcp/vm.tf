@@ -34,6 +34,11 @@ resource "google_compute_firewall" "http" {
   target_tags   = ["http"]
 }
 
+resource "random_password" "password" {
+  length  = 16
+  special = false
+}
+
 resource "google_compute_instance" "openwebui" {
   name         = "openwebui"
   machine_type = "e2-medium"
@@ -56,7 +61,11 @@ resource "google_compute_instance" "openwebui" {
     }
   }
 
-  metadata_startup_script = file("${path.module}/scripts/provision_basic.sh")
+  metadata_startup_script = templatefile("${path.module}/scripts/provision_basic.sh",
+    {
+      open_webui_user     = var.open_webui_user
+      open_webui_password = random_password.password.result
+  })
 
   metadata = {
     ssh-keys = "openwebui:${file("")} openwebui" # add a public key path
